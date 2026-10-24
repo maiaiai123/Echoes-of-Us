@@ -1,0 +1,1228 @@
+code_content = """<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Echoes of Us — Эхо Нас | Интерактивная Вселенная Памяти</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;800&family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
+    <!-- Three.js + OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <!-- Tween.js for smooth cinematic flight -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+
+    <style>
+        :root {
+            --font-serif: 'Cinzel', serif;
+            --font-sans: 'Plus Jakarta Sans', sans-serif;
+            --accent-cyan: #5ff2ff;
+            --accent-violet: #a855f7;
+            --accent-gold: #f59e0b;
+            --glass-bg: rgba(8, 12, 24, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #030308;
+            font-family: var(--font-sans);
+            color: #e2e8f0;
+        }
+
+        #webgl-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+            cursor: grab;
+        }
+        #webgl-canvas:active {
+            cursor: grabbing;
+        }
+
+        /* Ambient Vignette & Noise */
+        .vignette {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 2;
+            background: radial-gradient(circle at center, transparent 40%, rgba(2, 3, 8, 0.85) 100%);
+        }
+
+        /* HUD & Overlay Elements */
+        .hud-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 28px 36px;
+        }
+
+        .hud-interactive {
+            pointer-events: auto;
+        }
+
+        /* Top Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }.logo-box h1 {
+            font-family: var(--font-serif);
+            font-size: 1.6rem;
+            letter-spacing: 0.35em;
+            text-transform: uppercase;
+            font-weight: 800;
+            background: linear-gradient(135deg, #ffffff 40%, #a5b4fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 4px;
+            text-shadow: 0 0 30px rgba(165, 180, 252, 0.3);
+        }
+
+        .logo-box p {
+            font-size: 0.78rem;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: rgba(226, 232, 240, 0.5);
+        }
+
+        .audio-toggle-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            padding: 10px 18px;
+            border-radius: 999px;
+            color: #cbd5e1;
+            font-size: 0.8rem;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            backdrop-filter: blur(12px);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+        .audio-toggle-btn:hover {
+            border-color: var(--accent-cyan);
+            color: #fff;
+            box-shadow: 0 0 20px rgba(95, 242, 255, 0.25);
+        }
+        .audio-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 8px #ef4444;
+            transition: 0.3s;
+        }
+        .audio-indicator.active {
+            background: #22c55e;
+            box-shadow: 0 0 10px #22c55e;
+        }
+
+        /* Right Constellation Live Radar */
+        .constellation-radar {
+            position: fixed;
+            right: 36px;
+            top: 110px;
+            z-index: 10;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 20px;
+            width: 260px;
+            pointer-events: auto;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+        .radar-title {
+            font-family: var(--font-serif);
+            font-size: 0.75rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: #94a3b8;
+            margin-bottom: 14px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .constellation-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .constellation-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.82rem;
+            cursor: pointer;
+            padding: 6px 8px;
+            border-radius: 8px;
+            transition: 0.2s;
+        }
+        .constellation-item:hover {
+            background: rgba(255,255,255,0.06);
+            transform: translateX(4px);
+        }
+        .constellation-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .constellation-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+
+        /* Bottom Action Dock */
+        .bottom-dock {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            width: 100%;
+        }
+
+        .action-btn {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            backdrop-filter: blur(20px);
+            color: #f1f5f9;
+            padding: 14px 28px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 600;letter-spacing: 0.15em;
+            text-transform: uppercase;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+        .action-btn:hover {
+            transform: translateY(-4px) scale(1.03);
+            border-color: rgba(255,255,255,0.4);
+            box-shadow: 0 15px 35px rgba(120, 119, 198, 0.3);
+        }
+        .action-btn.primary {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.4), rgba(59, 130, 246, 0.4));
+            border-color: rgba(168, 85, 247, 0.6);
+            box-shadow: 0 10px 30px rgba(168, 85, 247, 0.3);
+        }
+        .action-btn.primary:hover {
+            box-shadow: 0 15px 45px rgba(168, 85, 247, 0.55);
+        }
+
+        /* Modal Overlays (Ritual & Whisper Card) */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(3, 4, 10, 0.75);
+            backdrop-filter: blur(16px);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+            padding: 20px;
+        }
+        .modal-backdrop.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-card {
+            background: rgba(13, 16, 32, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 28px;
+            width: 100%;
+            max-width: 580px;
+            padding: 38px 42px;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, 0.8), 0 0 60px rgba(168, 85, 247, 0.18);
+            transform: scale(0.92) translateY(20px);
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+        }
+        .modal-backdrop.active .modal-card {
+            transform: scale(1) translateY(0);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 24px;
+            right: 28px;
+            background: transparent;
+            border: none;
+            color: #64748b;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .modal-close:hover {
+            color: #fff;
+        }
+
+        .ritual-header h2 {
+            font-family: var(--font-serif);
+            font-size: 1.6rem;
+            letter-spacing: 0.1em;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+        .ritual-header p {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+
+        /* Emotion Color Selector */
+        .field-label {
+            font-size: 0.75rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: #94a3b8;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .emotion-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 24px;
+        }
+        .emotion-chip {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 10px 12px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: #cbd5e1;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: 0.2s;
+        }
+        .emotion-chip:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+            background: rgba(255, 255, 255, 0.08);
+        }
+        .emotion-chip.selected {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: #fff;
+            box-shadow: 0 0 16px rgba(255, 255, 255, 0.25);
+            color: #fff;
+        }.ritual-textarea {
+            width: 100%;
+            height: 110px;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            padding: 14px 18px;
+            color: #f1f5f9;
+            font-family: var(--font-sans);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            resize: none;
+            outline: none;
+            margin-bottom: 20px;
+            transition: border-color 0.2s;
+        }
+        .ritual-textarea:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 15px rgba(95, 242, 255, 0.15);
+        }
+
+        /* Time Leap selector */
+        .time-leap-options {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 28px;
+        }
+        .time-pill {
+            flex: 1;
+            text-align: center;
+            padding: 8px 12px;
+            font-size: 0.78rem;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            cursor: pointer;
+            color: #94a3b8;
+            transition: 0.2s;
+        }
+        .time-pill.selected {
+            background: rgba(95, 242, 255, 0.15);
+            border-color: var(--accent-cyan);
+            color: #fff;
+        }
+
+        .submit-ritual-btn {
+            width: 100%;
+            padding: 16px;
+            border-radius: 14px;
+            border: none;
+            background: linear-gradient(135deg, #a855f7, #3b82f6);
+            color: #fff;
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            cursor: pointer;
+            box-shadow: 0 12px 30px rgba(168, 85, 247, 0.4);
+            transition: 0.3s;
+        }
+        .submit-ritual-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 16px 40px rgba(168, 85, 247, 0.6);
+        }
+
+        /* Echo Display Card (Viewing Star) */
+        .echo-card-view {
+            text-align: center;
+        }
+        .echo-origin {
+            font-family: var(--font-serif);
+            font-size: 0.75rem;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            color: var(--accent-cyan);
+            margin-bottom: 16px;
+            display: inline-block;
+            padding: 4px 14px;
+            border-radius: 999px;
+            background: rgba(95, 242, 255, 0.1);
+            border: 1px solid rgba(95, 242, 255, 0.25);
+        }
+        .echo-quote {
+            font-size: 1.25rem;
+            font-weight: 300;
+            line-height: 1.7;
+            color: #fff;
+            margin-bottom: 24px;
+            font-style: italic;
+        }
+        .echo-meta {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            color: #64748b;
+            font-size: 0.8rem;
+            letter-spacing: 0.05em;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            padding-top: 18px;
+        }
+
+        /* Tooltip on Hover */
+        .star-tooltip {
+            position: fixed;
+            z-index: 50;
+            background: rgba(10, 14, 30, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            backdrop-filter: blur(12px);
+            padding: 8px 14px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            color: #e2e8f0;
+            pointer-events: none;
+            opacity: 0;
+            transform: translate(-50%, -130%);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            white-space: nowrap;
+        }
+        .star-tooltip.visible {
+            opacity: 1;
+            transform: translate(-50%, -145%);
+        }/* Instructions Toast */
+        .instructions-hint {
+            position: fixed;
+            bottom: 95px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+            font-size: 0.78rem;
+            letter-spacing: 0.1em;
+            color: rgba(226, 232, 240, 0.45);
+            background: rgba(0,0,0,0.3);
+            padding: 6px 16px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.05);
+            pointer-events: none;
+        }
+
+        @media (max-width: 768px) {
+            .hud-layer { padding: 18px; }
+            .constellation-radar { display: none; }
+            .bottom-dock { flex-direction: column; gap: 10px; }
+            .action-btn { width: 100%; justify-content: center; }
+            .modal-card { padding: 26px 22px; }
+            .emotion-selector { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 3D Scene Viewport -->
+    <canvas id="webgl-canvas"></canvas>
+    <div class="vignette"></div>
+
+    <!-- HUD Overlay -->
+    <div class="hud-layer">
+        <header>
+            <div class="logo-box">
+                <h1>Echoes of Us</h1>
+                <p>Живая Вселенная Человеческих Чувств</p>
+            </div>
+            <button class="audio-toggle-btn hud-interactive" id="audioToggle" title="Звуковой пейзаж Вселенной">
+                <div class="audio-indicator" id="audioLed"></div>
+                <span id="audioLabel">Эмбиент: Выкл</span>
+            </button>
+        </header>
+
+        <!-- Instructions Toast -->
+        <div class="instructions-hint">
+            Вращайте мышью • Скролл для зума • Нажмите на искру, чтобы услышать шепот
+        </div>
+
+        <!-- Bottom Action Dock -->
+        <div class="bottom-dock hud-interactive">
+            <button class="action-btn primary" id="openRitualBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="10"/></svg>
+                Вплести Свое Эхо
+            </button>
+            <button class="action-btn" id="randomEchoBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                Поймать Случайное Эхо
+            </button>
+            <button class="action-btn" id="timeLeapBtn">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                Сквозь Время (Capsules)
+            </button>
+        </div>
+    </div>
+
+    <!-- Live Emotion Constellations Widget -->
+    <div class="constellation-radar">
+        <div class="radar-title">
+            <span>Эмоциональные созвездия</span>
+            <span id="totalEchoesCount">0 искр</span>
+        </div>
+        <div class="constellation-list" id="constellationList">
+            <!-- Dynamically populated -->
+        </div>
+    </div>
+
+    <!-- Modal: Ritual of Contribution (Вплести Эхо) -->
+    <div class="modal-backdrop" id="ritualModal">
+        <div class="modal-card">
+            <button class="modal-close" id="closeRitualBtn">&times;</button>
+            <div class="ritual-header">
+                <h2>Ритуал Вклада</h2>
+                <p>Ваша мысль не исчезнет в пустоте. Она превратится в мерцающую звезду, резонирующую со всей Вселенной.</p>
+            </div>
+
+            <label class="field-label">1. Выберите вибрацию вашего состояния</label><div class="emotion-selector" id="emotionOptions">
+                <div class="emotion-chip selected" data-emotion="wonder" data-color="#5ff2ff">
+                    <span style="background:#5ff2ff; width:8px; height:8px; border-radius:50%;"></span> Трепет / Wonder
+                </div>
+                <div class="emotion-chip" data-emotion="love" data-color="#f43f5e">
+                    <span style="background:#f43f5e; width:8px; height:8px; border-radius:50%;"></span> Любовь / Love
+                </div>
+                <div class="emotion-chip" data-emotion="melancholy" data-color="#818cf8">
+                    <span style="background:#818cf8; width:8px; height:8px; border-radius:50%;"></span> Меланхолия / Depth
+                </div>
+                <div class="emotion-chip" data-emotion="joy" data-color="#fbbf24">
+                    <span style="background:#fbbf24; width:8px; height:8px; border-radius:50%;"></span> Радость / Joy
+                </div>
+                <div class="emotion-chip" data-emotion="anxiety" data-color="#fb923c">
+                    <span style="background:#fb923c; width:8px; height:8px; border-radius:50%;"></span> Тревога / Pulse
+                </div>
+                <div class="emotion-chip" data-emotion="void" data-color="#c084fc">
+                    <span style="background:#c084fc; width:8px; height:8px; border-radius:50%;"></span> Пустота / Calm
+                </div>
+            </div>
+
+            <label class="field-label">2. Запечатлейте ваше чувство словами</label>
+            <textarea class="ritual-textarea" id="echoTextInput" placeholder="«Я стою на ночном перроне, падает снег, и мне почему-то совсем не одиноко...»" maxlength="280"></textarea>
+
+            <label class="field-label">3. Связь через время (Time Leap)</label>
+            <div class="time-leap-options" id="timeLeapOptions">
+                <div class="time-pill selected" data-leap="present">Настоящее (Сейчас)</div>
+                <div class="time-pill" data-leap="2035">В 2035 год (+9 лет)</div>
+                <div class="time-pill" data-leap="2050">В 2050 год (+24 года)</div>
+                <div class="time-pill" data-leap="2070">В 2070 год (+44 года)</div>
+            </div>
+
+            <button class="submit-ritual-btn" id="submitRitualBtn">Зажечь искру в вечности</button>
+        </div>
+    </div>
+
+    <!-- Modal: View Echo / Star Whisper -->
+    <div class="modal-backdrop" id="viewEchoModal">
+        <div class="modal-card echo-card-view">
+            <button class="modal-close" id="closeViewEchoBtn">&times;</button>
+            <div class="echo-origin" id="viewEchoConstellation">Созвездие Трепета</div>
+            <p class="echo-quote" id="viewEchoText">«Текст эха...»</p>
+            <div class="echo-meta">
+                <span id="viewEchoTime">Только что</span>
+                <span id="viewEchoLeap">Настоящее</span>
+                <span id="viewEchoDistance">Координаты: 0, 0, 0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hover Tooltip -->
+    <div class="star-tooltip" id="starTooltip">Эхо человека</div>
+
+    <script>
+        /* ============================================================
+           1. INITIAL SEED DATA & EMOTIONS CONFIGURATION
+           ============================================================ */
+        const EMOTIONS = {
+            wonder: { name: 'Трепет', color: '#5ff2ff', freq: 432, basePos: [150, 60, -50] },
+            love: { name: 'Любовь', color: '#f43f5e', freq: 528, basePos: [-120, 80, 80] },
+            melancholy: { name: 'Меланхолия', color: '#818cf8', freq: 360, basePos: [-140, -90, -100] },
+            joy: { name: 'Радость', color: '#fbbf24', freq: 640, basePos: [110, 120, 90] },
+            anxiety: { name: 'Тревога', color: '#fb923c', freq: 285, basePos: [-60, -120, 140] },
+            void: { name: 'Пустота и Покой', color: '#c084fc', freq: 396, basePos: [70, -80, -130] }
+        };const INITIAL_ECHOES = [
+            { text: "Я смотрю на холодное звёздное небо из окна трамвая и впервые чувствую, что всё идёт так, как должно.", emotion: "wonder", leap: "present", time: "2 часа назад", x: 140, y: 70, z: -40 },
+            { text: "Если ты читаешь это через полвека — знай: мы тоже боялись, мы тоже безумно любили эту жизнь.", emotion: "love", leap: "2070", time: "Вчера", x: -110, y: 90, z: 70 },
+            { text: "Тишина после долгого дождя пахнет сиренью и старыми виниловыми пластинками.", emotion: "melancholy", leap: "present", time: "3 часа назад", x: -150, y: -80, z: -90 },
+            { text: "Мы только что закончили проект всей жизни и кричали от счастья на балконе в 4 утра!", emotion: "joy", leap: "present", time: "Сегодня", x: 100, y: 130, z: 85 },
+            { text: "Сердце колотится перед шагом в неизвестность. Но я всё равно шагаю.", emotion: "anxiety", leap: "present", time: "Только что", x: -70, y: -110, z: 130 },
+            { text: "Раствориться в абсолютном спокойствии леса, забыв на мгновение все имена и даты.", emotion: "void", leap: "2035", time: "4 дня назад", x: 80, y: -70, z: -120 },
+            { text: "Я не знаю тебя, но если тебе сейчас тяжело — просто глубоко вдохни. Ты существуешь, и это чудо.", emotion: "love", leap: "present", time: "Вчера", x: -130, y: 75, z: 95 },
+            { text: "Будущий странник 2050 года, скажи мне: вы научились беречь океаны и друг друга?", emotion: "wonder", leap: "2050", time: "1 день назад", x: 165, y: 55, z: -60 },
+            { text: "Ночная трасса, фары встречных машин и любимый альбом юности в динамиках.", emotion: "melancholy", leap: "present", time: "5 часов назад", x: -135, y: -100, z: -110 },
+            { text: "Я простил того, кого не мог простить четыре года. Словно камень упал с груди в бездну.", emotion: "void", leap: "present", time: "Сегодня", x: 60, y: -90, z: -140 },
+            { text: "Она улыбнулась мне в метро сквозь отражение стекла. На секунду мир замер.", emotion: "joy", leap: "present", time: "6 часов назад", x: 125, y: 110, z: 100 },
+            { text: "Слишком много мыслей перед сном. Кажется, Вселенная пульсирует у меня в висках.", emotion: "anxiety", leap: "present", time: "Только что", x: -50, y: -135, z: 150 }
+        ];
+
+        // Load stored echoes or initialize with seeds
+        let stored = localStorage.getItem('echoes_of_us_data');
+        let echoesData = stored ? JSON.parse(stored) : INITIAL_ECHOES;
+
+        /* ============================================================
+           2. PROCEDURAL AMBIENT SOUND ENGINE (Web Audio API)
+           ============================================================ */
+        class DeepSpaceAudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.isPlaying = false;
+                this.oscillators = [];
+                this.masterGain = null;
+                this.filter = null;
+            }
+
+            init() {
+                if (this.ctx) return;
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                this.ctx = new AudioCtx();
+
+                // Master gain
+                this.masterGain = this.ctx.createGain();
+                this.masterGain.gain.setValueAtTime(0.01, this.ctx.currentTime);
+                this.masterGain.connect(this.ctx.destination);
+
+                // Cosmic low-pass resonant filter
+                this.filter = this.ctx.createBiquadFilter();
+                this.filter.type = 'lowpass';
+                this.filter.frequency.setValueAtTime(450, this.ctx.currentTime);
+                this.filter.Q.setValueAtTime(3.5, this.ctx.currentTime);
+                this.filter.connect(this.masterGain);
+
+                // 3 harmonic drone generators (Space Drone Cord)
+                const baseFreqs = [55, 110, 164.81]; // A1, A2, E3 harmonic field
+                baseFreqs.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const oscGain = this.ctx.createGain();osc.type = idx === 0 ? 'sine' : 'triangle';
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+
+                    // Subtle LFO drift for alive organic breathing sound
+                    const lfo = this.ctx.createOscillator();
+                    const lfoGain = this.ctx.createGain();
+                    lfo.frequency.setValueAtTime(0.08 + idx * 0.04, this.ctx.currentTime);
+                    lfoGain.gain.setValueAtTime(4.0, this.ctx.currentTime);
+                    lfo.connect(osc.frequency);
+                    lfo.start();
+
+                    oscGain.gain.setValueAtTime(0.18 / (idx + 1), this.ctx.currentTime);
+                    osc.connect(oscGain);
+                    oscGain.connect(this.filter);
+                    osc.start();
+                    this.oscillators.push(osc);
+                });
+            }
+
+            toggle() {
+                if (!this.ctx) this.init();
+
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+
+                if (!this.isPlaying) {
+                    this.masterGain.gain.linearRampToValueAtTime(0.4, this.ctx.currentTime + 2.5);
+                    this.isPlaying = true;
+                } else {
+                    this.masterGain.gain.linearRampToValueAtTime(0.001, this.ctx.currentTime + 1.2);
+                    this.isPlaying = false;
+                }
+                return this.isPlaying;
+            }
+
+            // Play ethereal resonance chime when an Echo is inspected or born
+            playEchoWhisper(frequency = 528, duration = 2.5) {
+                if (!this.ctx || !this.isPlaying) return;
+                const now = this.ctx.currentTime;
+
+                const chime = this.ctx.createOscillator();
+                const chimeGain = this.ctx.createGain();
+                chime.type = 'sine';
+                chime.frequency.setValueAtTime(frequency, now);
+                // slight frequency slide
+                chime.frequency.exponentialRampToValueAtTime(frequency * 1.05, now + duration);
+
+                chimeGain.gain.setValueAtTime(0.001, now);
+                chimeGain.gain.linearRampToValueAtTime(0.25, now + 0.15);
+                chimeGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+                chime.connect(chimeGain);
+                chimeGain.connect(this.masterGain);
+                chime.start(now);
+                chime.stop(now + duration + 0.1);
+            }
+
+            // Modulate filter cutoff based on camera distance or mood zone
+            modulateAtmosphere(val) {
+                if (!this.filter || !this.ctx) return;
+                const targetFreq = 250 + Math.min(Math.max(val, 0), 1) * 900;
+                this.filter.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.4);
+            }
+        }
+
+        const audioEngine = new DeepSpaceAudioEngine();
+
+        /* ============================================================
+           3. THREE.JS 3D COSMIC ENGINE
+           ============================================================ */
+        const canvas = document.getElementById('webgl-canvas');
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x030308, 0.0018);
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 4000);
+        camera.position.set(0, 80, 420);
+
+        const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.rotateSpeed = 0.6;
+        controls.zoomSpeed = 0.8;
+        controls.maxDistance = 1200;
+        controls.minDistance = 30;// Background Star Dust (Ambient infinite stars)
+        const dustCount = 4500;
+        const dustGeometry = new THREE.BufferGeometry();
+        const dustPositions = new Float32Array(dustCount * 3);
+        const dustColors = new Float32Array(dustCount * 3);
+
+        for (let i = 0; i < dustCount; i++) {
+            dustPositions[i * 3] = (Math.random() - 0.5) * 2200;
+            dustPositions[i * 3 + 1] = (Math.random() - 0.5) * 2200;
+            dustPositions[i * 3 + 2] = (Math.random() - 0.5) * 2200;
+
+            const c = new THREE.Color().setHSL(0.6 + Math.random() * 0.2, 0.4, 0.3 + Math.random() * 0.5);
+            dustColors[i * 3] = c.r;
+            dustColors[i * 3 + 1] = c.g;
+            dustColors[i * 3 + 2] = c.b;
+        }
+
+        dustGeometry.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+        dustGeometry.setAttribute('color', new THREE.BufferAttribute(dustColors, 3));
+
+        // Procedural circular glow texture for particles
+        function createStarTexture() {
+            const size = 64;
+            const c = document.createElement('canvas');
+            c.width = size;
+            c.height = size;
+            const ctx = c.getContext('2d');
+            const grad = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+            grad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+            grad.addColorStop(0.2, 'rgba(230, 240, 255, 0.85)');
+            grad.addColorStop(0.5, 'rgba(120, 160, 255, 0.25)');
+            grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, size, size);
+            return new THREE.CanvasTexture(c);
+        }
+
+        const starTexture = createStarTexture();
+
+        const dustMaterial = new THREE.PointsMaterial({
+            size: 3.5,
+            map: starTexture,
+            transparent: true,
+            vertexColors: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false
+        });
+
+        const starDust = new THREE.Points(dustGeometry, dustMaterial);
+        scene.add(starDust);
+
+        // Echoes (Human Stars) Objects
+        const echoMeshesGroup = new THREE.Group();
+        scene.add(echoMeshesGroup);
+
+        // Constellation Lines Group
+        const constellationLinesGroup = new THREE.Group();
+        scene.add(constellationLinesGroup);
+
+        // Build 3D Human Echoes and Constellation Lines
+        const echoRaycastTargets = [];
+
+        function buildEchoUniverse() {
+            // Clear existing
+            while (echoMeshesGroup.children.length > 0) {
+                const obj = echoMeshesGroup.children[0];
+                echoMeshesGroup.remove(obj);
+            }
+            while (constellationLinesGroup.children.length > 0) {
+                const obj = constellationLinesGroup.children[0];
+                constellationLinesGroup.remove(obj);
+            }
+            echoRaycastTargets.length = 0;
+
+            const emotionClusters = {};
+            Object.keys(EMOTIONS).forEach(k => emotionClusters[k] = []);
+
+            echoesData.forEach((echo, index) => {
+                const emConfig = EMOTIONS[echo.emotion] || EMOTIONS.wonder;
+                const color = new THREE.Color(emConfig.color);
+
+                // If no precalculated coord, cluster near emotion base position with natural jitter
+                if (echo.x === undefined) {
+                    const [bx, by, bz] = emConfig.basePos;
+                    const r = 40 + Math.random() * 50;
+                    const theta = Math.random() * Math.PI * 2;
+                    const phi = Math.acos((Math.random() * 2) - 1);
+                    echo.x = bx + r * Math.sin(phi) * Math.cos(theta);
+                    echo.y = by + r * Math.sin(phi) * Math.sin(theta);
+                    echo.z = bz + r * Math.cos(phi);
+                }
+
+                emotionClusters[echo.emotion].push(new THREE.Vector3(echo.x, echo.y, echo.z));// Star core sphere
+                const geom = new THREE.SphereGeometry(2.4, 16, 16);
+                const mat = new THREE.MeshBasicMaterial({ color: color });
+                const star = new THREE.Mesh(geom, mat);
+                star.position.set(echo.x, echo.y, echo.z);
+                star.userData = { echo, index, originalColor: color.clone() };
+
+                // Glowing outer halo sprite
+                const spriteMat = new THREE.SpriteMaterial({
+                    map: starTexture,
+                    color: color,
+                    transparent: true,
+                    blending: THREE.AdditiveBlending,
+                    opacity: 0.85
+                });
+                const sprite = new THREE.Sprite(spriteMat);
+                sprite.scale.set(16, 16, 1);
+                star.add(sprite);
+
+                echoMeshesGroup.add(star);
+                echoRaycastTargets.push(star);
+            });
+
+            // Draw glowing constellation bonds between stars in the same emotion constellation
+            Object.keys(emotionClusters).forEach(k => {
+                const pts = emotionClusters[k];
+                if (pts.length > 1) {
+                    const lineGeom = new THREE.BufferGeometry().setFromPoints(pts);
+                    const lineMat = new THREE.LineBasicMaterial({
+                        color: new THREE.Color(EMOTIONS[k].color),
+                        transparent: true,
+                        opacity: 0.22,
+                        blending: THREE.AdditiveBlending
+                    });
+                    const line = new THREE.Line(lineGeom, lineMat);
+                    constellationLinesGroup.add(line);
+                }
+            });
+
+            updateConstellationUI();
+        }
+
+        buildEchoUniverse();
+
+        /* ============================================================
+           4. INTERACTIVE RAYCASTING & INSPECTION
+           ============================================================ */
+        const raycaster = new THREE.Raycaster();
+        raycaster.params.Points.threshold = 4;
+        const mouse = new THREE.Vector2(-9999, -9999);
+        const tooltip = document.getElementById('starTooltip');
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            tooltip.style.left = ${e.clientX}px;
+            tooltip.style.top = ${e.clientY}px;
+        });
+
+        let hoveredStar = null;
+
+        function checkIntersections() {
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(echoRaycastTargets, false);
+
+            if (intersects.length > 0) {
+                const target = intersects[0].object;
+                if (hoveredStar !== target) {
+                    if (hoveredStar) hoveredStar.scale.set(1, 1, 1);
+                    hoveredStar = target;
+                    hoveredStar.scale.set(1.7, 1.7, 1.7);
+                    document.body.style.cursor = 'pointer';
+
+                    const echo = hoveredStar.userData.echo;
+                    const em = EMOTIONS[echo.emotion] || EMOTIONS.wonder;
+                    tooltip.innerHTML = <strong>${em.name}</strong> • «${echo.text.substring(0, 32)}...»;
+                    tooltip.classList.add('visible');
+
+                    // Play tiny harmonic shimmer on hover
+                    if (audioEngine.isPlaying) {
+                        audioEngine.playEchoWhisper(em.freq, 0.4);
+                    }
+                }
+            } else {
+                if (hoveredStar) {
+                    hoveredStar.scale.set(1, 1, 1);
+                    hoveredStar = null;
+                    document.body.style.cursor = 'default';
+                    tooltip.classList.remove('visible');
+                }
+            }
+        }
+
+        // Click to Open Star Echo
+        window.addEventListener('click', (e) => {
+            if (e.target.closest('.hud-interactive') || e.target.closest('.modal-card')) return;raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(echoRaycastTargets, false);
+
+            if (intersects.length > 0) {
+                const star = intersects[0].object;
+                openEchoCard(star.userData.echo, star.position);
+            }
+        });
+
+        // Open Echo Details Modal + Cinematic Camera Focus
+        function openEchoCard(echo, position) {
+            const em = EMOTIONS[echo.emotion] || EMOTIONS.wonder;
+            document.getElementById('viewEchoConstellation').innerText = Созвездие: ${em.name};
+            document.getElementById('viewEchoConstellation').style.color = em.color;
+            document.getElementById('viewEchoConstellation').style.borderColor = em.color;
+            document.getElementById('viewEchoText').innerText = «${echo.text}»;
+            document.getElementById('viewEchoTime').innerText = Запечатлено: ${echo.time || 'Только что'};
+            document.getElementById('viewEchoLeap').innerText = echo.leap === 'present' ? 'В настоящем' : Капсула времени: ${echo.leap};
+            document.getElementById('viewEchoDistance').innerText = Сектор [${Math.round(echo.x)}, ${Math.round(echo.y)}, ${Math.round(echo.z)}];
+
+            document.getElementById('viewEchoModal').classList.add('active');
+
+            if (audioEngine.isPlaying) {
+                audioEngine.playEchoWhisper(em.freq, 2.8);
+            }
+
+            // Smooth focus camera towards the chosen star
+            flyCameraTo(position.x, position.y, position.z, 75);
+        }
+
+        /* ============================================================
+           5. CINEMATIC FLIGHT ENGINE (Tween.js)
+           ============================================================ */
+        function flyCameraTo(tx, ty, tz, distOffset = 80, duration = 1800) {
+            const targetPos = new THREE.Vector3(tx, ty, tz);
+            const offset = new THREE.Vector3().subVectors(camera.position, targetPos).normalize().multiplyScalar(distOffset);
+            if (offset.length() < 10) offset.set(0, 20, distOffset);
+
+            const endCamPos = new THREE.Vector3().addVectors(targetPos, offset);
+
+            new TWEEN.Tween(camera.position)
+                .to({ x: endCamPos.x, y: endCamPos.y, z: endCamPos.z }, duration)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .start();
+
+            new TWEEN.Tween(controls.target)
+                .to({ x: targetPos.x, y: targetPos.y, z: targetPos.z }, duration)
+                .easing(TWEEN.Easing.Cubic.Out)
+                .start();
+        }
+
+        /* ============================================================
+           6. HOOKS: RANDOM ECHO ("Поймать случайное эхо")
+           ============================================================ */
+        document.getElementById('randomEchoBtn').addEventListener('click', () => {
+            if (echoesData.length === 0) return;
+            const randomIndex = Math.floor(Math.random() * echoesData.length);
+            const echo = echoesData[randomIndex];
+            flyCameraTo(echo.x, echo.y, echo.z, 60, 2200);
+
+            setTimeout(() => {
+                openEchoCard(echo, new THREE.Vector3(echo.x, echo.y, echo.z));
+            }, 1200);
+        });
+
+        /* ============================================================
+           7. RITUAL OF CONTRIBUTION (Вплести свое Эхо)
+           ============================================================ */
+        const ritualModal = document.getElementById('ritualModal');
+        const viewEchoModal = document.getElementById('viewEchoModal');
+        let selectedEmotion = 'wonder';
+        let selectedLeap = 'present';
+
+        document.getElementById('openRitualBtn').addEventListener('click', () => {
+            ritualModal.classList.add('active');
+        });
+
+        document.getElementById('closeRitualBtn').addEventListener('click', () => {
+            ritualModal.classList.remove('active');
+        });document.getElementById('closeViewEchoBtn').addEventListener('click', () => {
+            viewEchoModal.classList.remove('active');
+        });
+
+        // Emotion chips click
+        document.querySelectorAll('.emotion-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                document.querySelectorAll('.emotion-chip').forEach(c => c.classList.remove('selected'));
+                chip.classList.add('selected');
+                selectedEmotion = chip.dataset.emotion;
+                if (audioEngine.isPlaying) {
+                    audioEngine.playEchoWhisper(EMOTIONS[selectedEmotion].freq, 0.6);
+                }
+            });
+        });
+
+        // Time Leap pills click
+        document.querySelectorAll('.time-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                document.querySelectorAll('.time-pill').forEach(p => p.classList.remove('selected'));
+                pill.classList.add('selected');
+                selectedLeap = pill.dataset.leap;
+            });
+        });
+
+        // Submit ritual: Create new star and animate into orbit
+        document.getElementById('submitRitualBtn').addEventListener('click', () => {
+            const input = document.getElementById('echoTextInput');
+            const text = input.value.trim();
+            if (!text) {
+                input.focus();
+                return;
+            }
+
+            const emConfig = EMOTIONS[selectedEmotion];
+            const [bx, by, bz] = emConfig.basePos;
+            const r = 35 + Math.random() * 45;
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos((Math.random() * 2) - 1);
+
+            const newEcho = {
+                text: text,
+                emotion: selectedEmotion,
+                leap: selectedLeap,
+                time: "Только что",
+                x: bx + r * Math.sin(phi) * Math.cos(theta),
+                y: by + r * Math.sin(phi) * Math.sin(theta),
+                z: bz + r * Math.cos(phi)
+            };
+
+            echoesData.push(newEcho);
+            localStorage.setItem('echoes_of_us_data', JSON.stringify(echoesData));
+
+            input.value = '';
+            ritualModal.classList.remove('active');
+
+            // Rebuild scene with new star
+            buildEchoUniverse();
+
+            // Play sacred harmonic birth sound
+            if (audioEngine.isPlaying) {
+                audioEngine.playEchoWhisper(emConfig.freq * 1.5, 3.5);
+            }
+
+            // Fly camera smoothly to the newly born star
+            flyCameraTo(newEcho.x, newEcho.y, newEcho.z, 70, 2000);
+        });
+
+        /* ============================================================
+           8. TIME LEAP (Capsules Filter Hook)
+           ============================================================ */
+        let timeLeapFilterActive = false;
+        document.getElementById('timeLeapBtn').addEventListener('click', () => {
+            timeLeapFilterActive = !timeLeapFilterActive;
+            const btn = document.getElementById('timeLeapBtn');
+
+            if (timeLeapFilterActive) {
+                btn.style.borderColor = 'var(--accent-cyan)';
+                btn.style.background = 'rgba(95, 242, 255, 0.2)';
+                btn.innerHTML = <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Фильтр: Только Капсулы;
+
+                // Dim present echoes and highlight future leaps
+                echoMeshesGroup.children.forEach(mesh => {
+                    const leap = mesh.userData.echo.leap;
+                    if (leap === 'present') {
+                        mesh.visible = false;
+                    } else {
+                        mesh.visible = true;mesh.scale.set(2, 2, 2);
+                    }
+                });
+            } else {
+                btn.style.borderColor = '';
+                btn.style.background = '';
+                btn.innerHTML = <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Сквозь Время (Capsules);
+
+                echoMeshesGroup.children.forEach(mesh => {
+                    mesh.visible = true;
+                    mesh.scale.set(1, 1, 1);
+                });
+            }
+        });
+
+        /* ============================================================
+           9. RADAR WIDGET (Live Constellation Balance)
+           ============================================================ */
+        function updateConstellationUI() {
+            const list = document.getElementById('constellationList');
+            list.innerHTML = '';
+            document.getElementById('totalEchoesCount').innerText = ${echoesData.length} искр;
+
+            const counts = {};
+            Object.keys(EMOTIONS).forEach(k => counts[k] = 0);
+            echoesData.forEach(e => counts[e.emotion] = (counts[e.emotion] || 0) + 1);
+
+            Object.entries(EMOTIONS).forEach(([key, val]) => {
+                const count = counts[key] || 0;
+                const percent = Math.round((count / (echoesData.length || 1)) * 100);
+
+                const item = document.createElement('div');
+                item.className = 'constellation-item';
+                item.innerHTML = 
+                    <div class="constellation-badge">
+                        <span class="constellation-dot" style="background:${val.color}; box-shadow:0 0 8px ${val.color};"></span>
+                        <span>${val.name}</span>
+                    </div>
+                    <span style="color:#64748b; font-size:0.75rem;">${count} (${percent}%)</span>
+                ;
+
+                // Clicking an emotion navigates camera to its constellation center
+                item.addEventListener('click', () => {
+                    const [bx, by, bz] = val.basePos;
+                    flyCameraTo(bx, by, bz, 140, 2000);
+                    if (audioEngine.isPlaying) {
+                        audioEngine.playEchoWhisper(val.freq, 1.2);
+                    }
+                });
+
+                list.appendChild(item);
+            });
+        }
+
+        /* ============================================================
+           10. AUDIO TOGGLE BUTTON
+           ============================================================ */
+        const audioBtn = document.getElementById('audioToggle');
+        const audioLed = document.getElementById('audioLed');
+        const audioLabel = document.getElementById('audioLabel');
+
+        audioBtn.addEventListener('click', () => {
+            const active = audioEngine.toggle();
+            if (active) {
+                audioLed.classList.add('active');
+                audioLabel.innerText = "Эмбиент: В эфире";
+            } else {
+                audioLed.classList.remove('active');
+                audioLabel.innerText = "Эмбиент: Выкл";
+            }
+        });
+
+        /* ============================================================
+           11. MAIN ANIMATION & RENDER LOOP
+           ============================================================ */
+        let clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+            TWEEN.update();
+
+            const time = clock.getElapsedTime();
+
+            // Very slow natural rotation of the infinite cosmic dust
+            starDust.rotation.y = time * 0.015;
+            starDust.rotation.x = Math.sin(time * 0.008) * 0.05;
+
+            // Breathing pulse of star halos and subtle floating oscillationechoMeshesGroup.children.forEach((star, idx) => {
+                const pulse = 1 + Math.sin(time * 2.5 + idx * 0.8) * 0.18;
+                if (star !== hoveredStar) {
+                    star.children[0].scale.set(16 * pulse, 16 * pulse, 1);
+                }
+                // Gentle celestial float
+                star.position.y += Math.sin(time * 1.2 + idx) * 0.02;
+            });
+
+            // Constellation line subtle shimmering
+            constellationLinesGroup.children.forEach((line, idx) => {
+                line.material.opacity = 0.18 + Math.sin(time * 1.5 + idx) * 0.08;
+            });
+
+            // Audio cutoff reactive to camera distance from universe core
+            if (audioEngine.isPlaying) {
+                const distRatio = camera.position.length() / 800;
+                audioEngine.modulateAtmosphere(1 - distRatio);
+            }
+
+            checkIntersections();
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+
+        // Responsive resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
